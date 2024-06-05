@@ -1,7 +1,12 @@
 #include "ft_ping.h"
 
-int	running = 1;	
+int		running = 1;	
+struct timeval 	start_time;
+int		options = 0;
 
+float	find_time_difference(struct timeval *t1, struct timeval *t2) {
+	return ((t2->tv_sec - t1->tv_sec) * 1000000 + t2->tv_usec - t1->tv_usec);
+}
 char	*dns_lookup(char *host) {
 	struct hostent	*host_entity;
 
@@ -47,6 +52,7 @@ struct sockaddr_in config_dest(char *ip) {
 int	send_request(int sockfd, struct sockaddr_in *dest, int id) {
 	t_ping	ping = create_packet(id);
 	
+	gettimeofday(&start_time, NULL);
 	if (sendto(sockfd, &ping, sizeof(ping), 0, (struct sockaddr *)dest, (socklen_t)sizeof(*dest)) == -1)
 		return (0);
 	return (-1);
@@ -55,8 +61,10 @@ int	send_request(int sockfd, struct sockaddr_in *dest, int id) {
 void	display_reply(char *ip, char *buffer, int size) {
 	struct ip *reply = (struct ip *)buffer;
 	struct icmp_echo* icmp = (struct icmp_echo*)(buffer + IP_HEADER_SIZE);
+	struct timeval end_time;
 
-	printf("%d bytes from %s: icmp seq=%d ttl=%d time=%d ms\n", size - IP_HEADER_SIZE, ip, ntohs(icmp->seq), reply->ip_ttl, 1);
+	gettimeofday(&end_time, NULL);
+	printf("%d bytes from %s: icmp seq=%d ttl=%d time=%.3f ms\n", size - IP_HEADER_SIZE, ip, ntohs(icmp->seq), reply->ip_ttl, find_time_difference(&start_time, &end_time) / 1000);
 }
 
 int	recv_response(char *ip, int sockfd, struct sockaddr_in *dest) {
@@ -72,13 +80,52 @@ int	recv_response(char *ip, int sockfd, struct sockaddr_in *dest) {
 	return (1);
 }
 
+int check_argument(int ac, char **av) {
+	if (ac == 2)
+		return (0);
+	if (ac == 3) {
+		if (strcmp(av[1], "-?") == 0 || strcmp(av[2], "-?") == 0)
+			return (1);
+		if (strcmp(av[1], "-v") == 0 || strcmp(av[2], "-v") == 0)
+			return (2);
+	}
+	return (-1);
+}
+
+char	*find_ip(int ac, char **av) {
+	if (ac == 2)
+		return (av[1]);
+	if (ac == 3) {
+		if (strcmp(av[1], "-?") == 0 || strcmp(av[1], "-v") == 0)
+			return (av[2]);
+		else
+			return (av[1]);
+	}
+	return (NULL);
+}
+
+void	print_help() {
+	printf("Usage: ping [OPTION...] HOST ...\nSend ICMP ECHO_REQUEST packets to network hosts.\n\n-? open the help menu\n-v verbose\n");
+}
+
 int main(int ac, char **av) {
 	signal(SIGINT, interrupt_handler);
-	if (ac != 2)
+
+	char	*host = find_ip(ac, av);
+	if (host == NULL)
 		return (0);
 
+	options = check_argument(ac, av);
+	if (options == -1)
+		return (0);
+
+	if (options == 1) {
+		print_help();
+		return (1);
+	}
+
 	int	id = 0;
-	char	*ip_dest = dns_lookup(av[1]);
+	char	*ip_dest = dns_lookup(host);
 	
 	if (!ip_dest) {
 		printf("Invalid hostname\n");
@@ -93,7 +140,10 @@ int main(int ac, char **av) {
 
 
 	struct sockaddr_in dest = config_dest(ip_dest);
-	printf("PING %s (%s): 56 data bytes\n", av[1], ip_dest);
+	if (options == 0)
+		printf("PING %s (%s): 56 data bytes\n", host, ip_dest);
+	else
+		printf("PING %s (%s): 56 data bytes, id 0x%x = %d\n", host, ip_dest, getpid(), getpid());
 	while (running) {
 		if (!send_request(sockfd, &dest, id)) {
 			close(sockfd);
