@@ -25,7 +25,7 @@ $(OBJS_DIR)/%.o	: 	srcs/%.c
 all	: $(NAME)
 
 $(NAME)	: 			$(OBJS_DIR) $(OBJS)
-		      		@$(CC) $(CFLAGS) $(OBJS) -o $(NAME) 
+		      		@$(CC) $(CFLAGS) $(OBJS) -lm -o $(NAME) 
 					@echo "\033[1;32m\nft_ping: Done!\033[0m"
 
 clean	:

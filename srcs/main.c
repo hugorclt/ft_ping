@@ -1,5 +1,9 @@
 #include "ft_ping.h"
 
+float	timestamp_history[MAX_MSG];
+int	total_received = 0;
+
+int		packet_received = 0;
 int		running = 1;	
 struct timeval 	start_time;
 int		options = 0;
@@ -7,6 +11,7 @@ int		options = 0;
 float	find_time_difference(struct timeval *t1, struct timeval *t2) {
 	return ((t2->tv_sec - t1->tv_sec) * 1000000 + t2->tv_usec - t1->tv_usec);
 }
+
 char	*dns_lookup(char *host) {
 	struct hostent	*host_entity;
 
@@ -58,16 +63,20 @@ int	send_request(int sockfd, struct sockaddr_in *dest, int id) {
 	return (-1);
 }
 
-void	display_reply(char *ip, char *buffer, int size) {
+void	display_reply( char *ip, char *buffer, int size) {
 	struct ip *reply = (struct ip *)buffer;
 	struct icmp_echo* icmp = (struct icmp_echo*)(buffer + IP_HEADER_SIZE);
 	struct timeval end_time;
 
 	gettimeofday(&end_time, NULL);
-	printf("%d bytes from %s: icmp seq=%d ttl=%d time=%.3f ms\n", size - IP_HEADER_SIZE, ip, ntohs(icmp->seq), reply->ip_ttl, find_time_difference(&start_time, &end_time) / 1000);
+	float time_diff = find_time_difference(&start_time, &end_time) / 1000;
+
+	timestamp_history[total_received] = time_diff;
+	total_received += 1;
+	printf("%d bytes from %s: icmp seq=%d ttl=%d time=%.3f ms\n", size - IP_HEADER_SIZE, ip, ntohs(icmp->seq), reply->ip_ttl, time_diff);
 }
 
-int	recv_response(char *ip, int sockfd, struct sockaddr_in *dest) {
+int	recv_response( char *ip, int sockfd, struct sockaddr_in *dest) {
 	char	buffer[100];
 	socklen_t len = sizeof(struct sockaddr_in);
 
@@ -76,7 +85,8 @@ int	recv_response(char *ip, int sockfd, struct sockaddr_in *dest) {
 	if (size == -1)
 		return (0);
 
-	display_reply(ip, buffer, size);
+	packet_received += 1;
+	display_reply( ip, buffer, size);
 	return (1);
 }
 
@@ -108,7 +118,7 @@ void	print_help() {
 	printf("Usage: ping [OPTION...] HOST ...\nSend ICMP ECHO_REQUEST packets to network hosts.\n\n-? open the help menu\n-v verbose\n");
 }
 
-int main(int ac, char **av) {
+int main(int ac, char **av) {	
 	signal(SIGINT, interrupt_handler);
 
 	char	*host = find_ip(ac, av);
@@ -150,14 +160,14 @@ int main(int ac, char **av) {
 			return (0);
 		}
 
-		if (!recv_response(ip_dest, sockfd, &dest)) {
+		if (!recv_response( ip_dest, sockfd, &dest)) {
 			close(sockfd);
 			return (0);
 		}
 		id = id + 1;
 		sleep(1);
 	}
-	print_end(id, 5, av[1]);
+	print_end(id, packet_received, av[1], timestamp_history);
 	close(sockfd);
 	return (1);
 }

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 
 #include <netdb.h>
 #include <netinet/in.h> 
@@ -36,6 +37,8 @@ struct icmp_echo {
 extern int running;
 #define IP_HEADER_SIZE 20
 
+#define MAX_MSG 512
+
 unsigned short calculate_checksum(unsigned short* b, int len); 
 void	interrupt_handler(int sig);
-void	print_end(int sent, int received, char *target);
+void	print_end(int sent, int received, char *target,  float history[MAX_MSG]);
