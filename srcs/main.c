@@ -77,7 +77,7 @@ void	display_reply( char *ip, char *buffer, int size) {
 }
 
 int	recv_response( char *ip, int sockfd, struct sockaddr_in *dest) {
-	char	buffer[100];
+	char	buffer[100];print_end
 	socklen_t len = sizeof(struct sockaddr_in);
 
 	bzero(&buffer, sizeof(buffer));
@@ -91,15 +91,23 @@ int	recv_response( char *ip, int sockfd, struct sockaddr_in *dest) {
 }
 
 int check_argument(int ac, char **av) {
-	if (ac == 2)
-		return (0);
-	if (ac == 3) {
-		if (strcmp(av[1], "-?") == 0 || strcmp(av[2], "-?") == 0)
-			return (1);
-		if (strcmp(av[1], "-v") == 0 || strcmp(av[2], "-v") == 0)
-			return (2);
+	(void)ac;
+	if (strcmp(av[1], "-?") == 0 || (av[2] && strcmp(av[2], "-?") == 0))
+		return (1);
+	if (strcmp(av[1], "--help") == 0 || (av[2] && strcmp(av[2], "--help") == 0))
+		return (1);
+	if (strcmp(av[1], "-v") == 0 || (av[2] && strcmp(av[2], "-v") == 0))
+		return (2);
+	if (strcmp(av[1], "--verbose") == 0 || (av[2] && strcmp(av[2], "--verbose") == 0))
+		return (2);
+	if ((av[1][0] == '-' && strlen(av[1]) == 2) || (av[2] && av[2][0] == '-' && strlen(av[2]) == 2)) {
+		char c = av[1][1];
+		if (av[2] && av[2][0] == '-')
+			c = av[2][1];
+		printf("ping: option requires an argument -- '%c'\nTry 'ping --help' or 'ping --usage' for more information.\n",c);
+		return (-1);
 	}
-	return (-1);
+	return (0);
 }
 
 char	*find_ip(int ac, char **av) {
@@ -118,7 +126,11 @@ void	print_help() {
 	printf("Usage: ping [OPTION...] HOST ...\nSend ICMP ECHO_REQUEST packets to network hosts.\n\n-? open the help menu\n-v verbose\n");
 }
 
-int main(int ac, char **av) {	
+int main(int ac, char **av) {
+	
+	if (ac == 1) {
+		printf("ping: missing host operand\nTry 'ping --help' or 'ping --usage' for more information.\n");
+	}
 	signal(SIGINT, interrupt_handler);
 
 	char	*host = find_ip(ac, av);
@@ -138,7 +150,7 @@ int main(int ac, char **av) {
 	char	*ip_dest = dns_lookup(host);
 	
 	if (!ip_dest) {
-		printf("Invalid hostname\n");
+		printf("ping: unknown host\n");
 		return (0);
 	}
 	
